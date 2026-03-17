@@ -4,3 +4,12 @@
 [2023-10-04 20:00:03] Função 'criar_conta' executada com argumentos (1, [], []) e {}. Retornou None
 [2023-10-04 20:00:14] Função 'criar_cliente' executada com argumentos ([<PessoaFisica: ('2')>],) e {}. Retornou None
 [2023-10-04 20:05:27] Função 'criar_cliente' executada com argumentos ([<PessoaFisica: ('Chappie', '3')>],) e {}. Retornou None
+[2026-03-17 20:29:04] Fun��o 'depositar' executada com argumentos ([],) e {}. Retornou None
+[2026-03-17 20:30:56] Função 'depositar' executada com argumentos ([],) e {}. Retornou None
+[2026-03-17 20:31:20] Função 'criar_cliente' executada com argumentos ([<PessoaFisica: ('fernando', '005457000000')>],) e {}. Retornou None
+[2026-03-17 20:31:27] Função 'criar_conta' executada com argumentos (1, [<PessoaFisica: ('fernando', '005457000000')>], []) e {}. Retornou None
+[2026-03-17 20:31:33] Função 'depositar' executada com argumentos ([<PessoaFisica: ('fernando', '005457000000')>],) e {}. Retornou None
+[2026-03-17 20:31:42] Função 'depositar' executada com argumentos ([<PessoaFisica: ('fernando', '005457000000')>],) e {}. Retornou None
+[2026-03-17 20:32:06] Função 'criar_cliente' executada com argumentos ([<PessoaFisica: ('fernando', '005457000000')>, <PessoaFisica: ('fernando', '00545700000')>],) e {}. Retornou None
+[2026-03-17 20:32:16] Função 'criar_conta' executada com argumentos (1, [<PessoaFisica: ('fernando', '005457000000')>, <PessoaFisica: ('fernando', '00545700000')>], [<ContaCorrente: ('0001', '1', 'fernando')>]) e {}. Retornou None
+[2026-03-17 20:32:28] Função 'depositar' executada com argumentos ([<PessoaFisica: ('fernando', '005457000000')>, <PessoaFisica: ('fernando', '00545700000')>],) e {}. Retornou None

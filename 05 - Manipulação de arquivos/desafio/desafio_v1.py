@@ -1,10 +1,11 @@
 import textwrap
-from abc import ABC, abstractclassmethod, abstractproperty
-from datetime import datetime
+from abc import ABC, abstractmethod
+from datetime import datetime, timezone
+from functools import wraps
 
 
 class ContasIterador:
-    def __init__(self, contas):
+    def __init__(self, contas: list['Conta']):
         self.contas = contas
         self._index = 0
 
@@ -27,24 +28,24 @@ class ContasIterador:
 
 
 class Cliente:
-    def __init__(self, endereco):
+    def __init__(self, endereco: str):
         self.endereco = endereco
-        self.contas = []
+        self.contas: list['Conta'] = []
         self.indice_conta = 0
 
-    def realizar_transacao(self, conta, transacao):
+    def realizar_transacao(self, conta: 'Conta', transacao: 'Transacao'):
         if len(conta.historico.transacoes_do_dia()) >= 2:
             print("\n@@@ Você excedeu o número de transações permitidas para hoje! @@@")
             return
 
         transacao.registrar(conta)
 
-    def adicionar_conta(self, conta):
+    def adicionar_conta(self, conta: 'Conta'):
         self.contas.append(conta)
 
 
 class PessoaFisica(Cliente):
-    def __init__(self, nome, data_nascimento, cpf, endereco):
+    def __init__(self, nome: str, data_nascimento: str, cpf: str, endereco: str):
         super().__init__(endereco)
         self.nome = nome
         self.data_nascimento = data_nascimento
@@ -54,39 +55,71 @@ class PessoaFisica(Cliente):
         return f"<{self.__class__.__name__}: ('{self.cpf}')>"
 
 
+class Historico:
+    def __init__(self):
+        self._transacoes: list[dict] = []
+
+    @property
+    def transacoes(self) -> list[dict]:
+        return self._transacoes
+
+    def adicionar_transacao(self, transacao: 'Transacao'):
+        self._transacoes.append(
+            {
+                "tipo": transacao.__class__.__name__,
+                "valor": transacao.valor,
+                "data": datetime.now(timezone.utc).strftime("%d-%m-%Y %H:%M:%S"),
+            }
+        )
+
+    def gerar_relatorio(self, tipo_transacao: str | None = None):
+        for transacao in self._transacoes:
+            if tipo_transacao is None or transacao["tipo"].lower() == tipo_transacao.lower():
+                yield transacao
+
+    def transacoes_do_dia(self) -> list[dict]:
+        data_atual = datetime.now(timezone.utc).date()
+        transacoes = []
+        for transacao in self._transacoes:
+            data_transacao = datetime.strptime(transacao["data"], "%d-%m-%Y %H:%M:%S").date()
+            if data_atual == data_transacao:
+                transacoes.append(transacao)
+        return transacoes
+
+
 class Conta:
-    def __init__(self, numero, cliente):
-        self._saldo = 0
+    def __init__(self, numero: int, cliente: Cliente):
+        self._saldo = 0.0
         self._numero = numero
         self._agencia = "0001"
         self._cliente = cliente
         self._historico = Historico()
 
     @classmethod
-    def nova_conta(cls, cliente, numero):
+    def nova_conta(cls, cliente: Cliente, numero: int) -> 'Conta':
         return cls(numero, cliente)
 
     @property
-    def saldo(self):
+    def saldo(self) -> float:
         return self._saldo
 
     @property
-    def numero(self):
+    def numero(self) -> int:
         return self._numero
 
     @property
-    def agencia(self):
+    def agencia(self) -> str:
         return self._agencia
 
     @property
-    def cliente(self):
+    def cliente(self) -> Cliente:
         return self._cliente
 
     @property
-    def historico(self):
+    def historico(self) -> Historico:
         return self._historico
 
-    def sacar(self, valor):
+    def sacar(self, valor: float) -> bool:
         saldo = self.saldo
         excedeu_saldo = valor > saldo
 
@@ -103,7 +136,7 @@ class Conta:
 
         return False
 
-    def depositar(self, valor):
+    def depositar(self, valor: float) -> bool:
         if valor > 0:
             self._saldo += valor
             print("\n=== Depósito realizado com sucesso! ===")
@@ -115,16 +148,16 @@ class Conta:
 
 
 class ContaCorrente(Conta):
-    def __init__(self, numero, cliente, limite=500, limite_saques=3):
+    def __init__(self, numero: int, cliente: Cliente, limite: float = 500.0, limite_saques: int = 3):
         super().__init__(numero, cliente)
         self._limite = limite
         self._limite_saques = limite_saques
 
     @classmethod
-    def nova_conta(cls, cliente, numero, limite, limite_saques):
+    def nova_conta(cls, cliente: Cliente, numero: int, limite: float = 500.0, limite_saques: int = 3) -> 'ContaCorrente':
         return cls(numero, cliente, limite, limite_saques)
 
-    def sacar(self, valor):
+    def sacar(self, valor: float) -> bool:
         numero_saques = len(
             [transacao for transacao in self.historico.transacoes if transacao["tipo"] == Saque.__name__]
         )
@@ -143,10 +176,10 @@ class ContaCorrente(Conta):
 
         return False
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: ('{self.agencia}', '{self.numero}', '{self.cliente.nome}')>"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"""\
             Agência:\t{self.agencia}
             C/C:\t\t{self.numero}
@@ -154,58 +187,26 @@ class ContaCorrente(Conta):
         """
 
 
-class Historico:
-    def __init__(self):
-        self._transacoes = []
-
-    @property
-    def transacoes(self):
-        return self._transacoes
-
-    def adicionar_transacao(self, transacao):
-        self._transacoes.append(
-            {
-                "tipo": transacao.__class__.__name__,
-                "valor": transacao.valor,
-                "data": datetime.utcnow().strftime("%d-%m-%Y %H:%M:%S"),
-            }
-        )
-
-    def gerar_relatorio(self, tipo_transacao=None):
-        for transacao in self._transacoes:
-            if tipo_transacao is None or transacao["tipo"].lower() == tipo_transacao.lower():
-                yield transacao
-
-    def transacoes_do_dia(self):
-        data_atual = datetime.utcnow().date()
-        transacoes = []
-        for transacao in self._transacoes:
-            data_transacao = datetime.strptime(transacao["data"], "%d-%m-%Y %H:%M:%S").date()
-            if data_atual == data_transacao:
-                transacoes.append(transacao)
-        return transacoes
-
-
 class Transacao(ABC):
     @property
-    @abstractproperty
-    def valor(self):
+    @abstractmethod
+    def valor(self) -> float:
         pass
 
-    @abstractclassmethod
-    def registrar(self, conta):
+    @abstractmethod
+    def registrar(self, conta: Conta):
         pass
 
 
 class Saque(Transacao):
-    def __init__(self, valor):
+    def __init__(self, valor: float):
         self._valor = valor
 
     @property
-    def valor(self):
+    def valor(self) -> float:
         return self._valor
 
-    def registrar(self, conta):
+    def registrar(self, conta: Conta):
         sucesso_transacao = conta.sacar(self.valor)
 
         if sucesso_transacao:
@@ -213,14 +214,14 @@ class Saque(Transacao):
 
 
 class Deposito(Transacao):
-    def __init__(self, valor):
+    def __init__(self, valor: float):
         self._valor = valor
 
     @property
-    def valor(self):
+    def valor(self) -> float:
         return self._valor
 
-    def registrar(self, conta):
+    def registrar(self, conta: Conta):
         sucesso_transacao = conta.depositar(self.valor)
 
         if sucesso_transacao:
@@ -228,19 +229,19 @@ class Deposito(Transacao):
 
 
 def log_transacao(func):
+    @wraps(func)
     def envelope(*args, **kwargs):
         resultado = func(*args, **kwargs)
-        data_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         # TODO: alterar a implementação para salvar em arquivo.
-        # f"[{data_hora}] Função '{func.__name__}' executada com argumentos {args} e {kwargs}. Retornou {result}\n"
-        print(f"{data_hora}: {func.__name__.upper()}")
+        print(f"[{data_hora}] {func.__name__.upper()} executada.")
         return resultado
 
     return envelope
 
 
-def menu():
-    menu = """\n
+def menu() -> str:
+    opcoes_menu = """\n
     ================ MENU ================
     [d]\tDepositar
     [s]\tSacar
@@ -250,25 +251,25 @@ def menu():
     [nu]\tNovo usuário
     [q]\tSair
     => """
-    return input(textwrap.dedent(menu))
+    return input(textwrap.dedent(opcoes_menu))
 
 
-def filtrar_cliente(cpf, clientes):
+def filtrar_cliente(cpf: str, clientes: list[Cliente]) -> Cliente | None:
     clientes_filtrados = [cliente for cliente in clientes if cliente.cpf == cpf]
     return clientes_filtrados[0] if clientes_filtrados else None
 
 
-def recuperar_conta_cliente(cliente):
+def recuperar_conta_cliente(cliente: Cliente) -> Conta | None:
     if not cliente.contas:
         print("\n@@@ Cliente não possui conta! @@@")
-        return
+        return None
 
     # FIXME: não permite cliente escolher a conta
     return cliente.contas[0]
 
 
 @log_transacao
-def depositar(clientes):
+def depositar(clientes: list[Cliente]):
     cpf = input("Informe o CPF do cliente: ")
     cliente = filtrar_cliente(cpf, clientes)
 
@@ -287,7 +288,7 @@ def depositar(clientes):
 
 
 @log_transacao
-def sacar(clientes):
+def sacar(clientes: list[Cliente]):
     cpf = input("Informe o CPF do cliente: ")
     cliente = filtrar_cliente(cpf, clientes)
 
@@ -306,7 +307,7 @@ def sacar(clientes):
 
 
 @log_transacao
-def exibir_extrato(clientes):
+def exibir_extrato(clientes: list[Cliente]):
     cpf = input("Informe o CPF do cliente: ")
     cliente = filtrar_cliente(cpf, clientes)
 
@@ -334,7 +335,7 @@ def exibir_extrato(clientes):
 
 
 @log_transacao
-def criar_cliente(clientes):
+def criar_cliente(clientes: list[Cliente]):
     cpf = input("Informe o CPF (somente número): ")
     cliente = filtrar_cliente(cpf, clientes)
 
@@ -346,15 +347,15 @@ def criar_cliente(clientes):
     data_nascimento = input("Informe a data de nascimento (dd-mm-aaaa): ")
     endereco = input("Informe o endereço (logradouro, nro - bairro - cidade/sigla estado): ")
 
-    cliente = PessoaFisica(nome=nome, data_nascimento=data_nascimento, cpf=cpf, endereco=endereco)
+    novo_cliente = PessoaFisica(nome=nome, data_nascimento=data_nascimento, cpf=cpf, endereco=endereco)
 
-    clientes.append(cliente)
+    clientes.append(novo_cliente)
 
     print("\n=== Cliente criado com sucesso! ===")
 
 
 @log_transacao
-def criar_conta(numero_conta, clientes, contas):
+def criar_conta(numero_conta: int, clientes: list[Cliente], contas: list[Conta]):
     cpf = input("Informe o CPF do cliente: ")
     cliente = filtrar_cliente(cpf, clientes)
 
@@ -362,22 +363,22 @@ def criar_conta(numero_conta, clientes, contas):
         print("\n@@@ Cliente não encontrado, fluxo de criação de conta encerrado! @@@")
         return
 
-    conta = ContaCorrente.nova_conta(cliente=cliente, numero=numero_conta, limite=500, limite_saques=50)
+    conta = ContaCorrente.nova_conta(cliente=cliente, numero=numero_conta, limite=500.0, limite_saques=50)
     contas.append(conta)
     cliente.contas.append(conta)
 
     print("\n=== Conta criada com sucesso! ===")
 
 
-def listar_contas(contas):
+def listar_contas(contas: list[Conta]):
     for conta in ContasIterador(contas):
         print("=" * 100)
         print(textwrap.dedent(str(conta)))
 
 
 def main():
-    clientes = []
-    contas = []
+    clientes: list[Cliente] = []
+    contas: list[Conta] = []
 
     while True:
         opcao = menu()
@@ -408,4 +409,5 @@ def main():
             print("\n@@@ Operação inválida, por favor selecione novamente a operação desejada. @@@")
 
 
-main()
+if __name__ == "__main__":
+    main()
